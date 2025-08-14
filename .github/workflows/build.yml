@@ -1,0 +1,72 @@
+name: Build Mobile App
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        cd app
+        npm install
+    
+    - name: Build web app
+      run: |
+        cd app
+        npm run build
+    
+    - name: Setup Capacitor
+      run: |
+        cd app
+        npx cap add ios
+        npx cap add android
+        npx cap sync
+    
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+    
+    - name: Build iOS App
+      run: |
+        cd app/ios/App
+        xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -destination generic/platform=iOS -archivePath ./build/App.xcarchive archive
+        xcodebuild -exportArchive -archivePath ./build/App.xcarchive -exportOptionsPlist ../../../exportOptions.plist -exportPath ./build/
+    
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    
+    - name: Build Android App
+      run: |
+        cd app/android
+        ./gradlew assembleRelease
+    
+    - name: Upload iOS App
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-app
+        path: app/ios/App/build/*.ipa
+    
+    - name: Upload Android App
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-app
+        path: app/android/app/build/outputs/apk/release/*.apk
